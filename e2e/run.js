@@ -174,6 +174,125 @@ async function signup(page, name) {
   check("after leaving, the tab is gone for him", true);
 
   await ama.screenshot({ path: __dirname + "/ama-tab.png", fullPage: true });
+  // ── Password reset ────────────────────────────────────────────────────
+  // Mail never leaves the machine: the backend is started with MAIL_OUTBOX_FILE,
+  // which makes it append each message to a file instead of sending it.
+  const fs = require("fs");
+  const OUTBOX = process.env.MAIL_OUTBOX_FILE || "/tmp/claude-0/outbox.jsonl";
+  const amaEmail = `ama${stamp}@e2e.dev`;
+  const NEW_PW = "my brand new passphrase";
+  const mailsTo = (addr) =>
+    (fs.existsSync(OUTBOX) ? fs.readFileSync(OUTBOX, "utf8").trim().split("\n").filter(Boolean).map((l) => JSON.parse(l)) : []).filter((m) => m.to === addr);
+  const waitForMail = async (addr, count) => {
+    for (let i = 0; i < 50; i++) {
+      const m = mailsTo(addr);
+      if (m.length >= count) return m[m.length - 1];
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    throw new Error(`no mail #${count} for ${addr}`);
+  };
+
+  const phoneCtx = await browser.newContext(); // a second, separate device for Ama
+  const resetCtx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  for (const ctx of [phoneCtx, resetCtx]) {
+    await ctx.route("**/*", async (route) => {
+      if (route.request().resourceType() !== "document") return route.continue();
+      const res = await route.fetch();
+      await route.fulfill({ response: res, headers: { ...res.headers(), "content-security-policy": csp } });
+    });
+  }
+  const phone = await phoneCtx.newPage();
+  const fresh = await resetCtx.newPage();
+  // Only the deliberate wrong-password / used-link responses are tolerated here.
+  const resetExpected = /ERR_TUNNEL_CONNECTION_FAILED|status of 40[01]/;
+  const requestedUrls = [];
+  for (const p of [phone, fresh]) p.on("console", (m) => m.type() === "error" && !resetExpected.test(m.text()) && consoleErrors.push(m.text()));
+  fresh.on("request", (r) => requestedUrls.push(r.url()));
+
+  await phone.goto(`${BASE}/login`);
+  await phone.getByLabel("Email").fill(amaEmail);
+  await phone.getByLabel(/Password/).fill(PW);
+  await phone.getByRole("button", { name: "Log in" }).click();
+  await phone.getByRole("heading", { name: "Your tabs" }).waitFor();
+
+  // Request the link from the login page, as a logged-out visitor would.
+  await fresh.goto(`${BASE}/login`);
+  await fresh.getByRole("link", { name: "Forgot your password?" }).click();
+  await fresh.waitForURL(/\/forgot$/);
+  await fresh.getByLabel("Email").fill(amaEmail);
+  await fresh.getByRole("button", { name: "Send reset link" }).click();
+  const genericText = "If that email has an account, a reset link is on its way. It works for 30 minutes.";
+  await fresh.getByText(genericText).waitFor();
+  const forAma = await fresh.getByText(genericText).textContent();
+
+  // An address with no account gets the very same page.
+  await fresh.goto(`${BASE}/forgot`);
+  await fresh.getByLabel("Email").fill(`nobody${stamp}@e2e.dev`);
+  await fresh.getByRole("button", { name: "Send reset link" }).click();
+  await fresh.getByText(genericText).waitFor();
+  check("forgot page shows the same confirmation for a real and an unknown email", forAma === (await fresh.getByText(genericText).textContent()));
+  await new Promise((r) => setTimeout(r, 500));
+  check("no email is sent for the unknown address", mailsTo(`nobody${stamp}@e2e.dev`).length === 0);
+
+  const mail = await waitForMail(amaEmail, 1);
+  const link = mail.text.match(/https?:\/\/\S+/)[0];
+  const token = new URL(link).hash.slice(1);
+  check("reset email links to the app origin with the token in the #fragment", link.startsWith(`${BASE}/reset#`) && /^[A-Za-z0-9_-]{43}$/.test(token));
+
+  await fresh.goto(link);
+  await fresh.getByRole("heading", { name: "Choose a new password" }).waitFor();
+  check("the token is stripped from the address bar", !fresh.url().includes(token) && (await fresh.evaluate(() => location.hash)) === "");
+
+  await fresh.getByLabel("New password (10+ characters)").fill(NEW_PW);
+  await fresh.getByLabel("Confirm new password").fill(NEW_PW + "x");
+  await fresh.getByRole("button", { name: "Change password" }).click();
+  await fresh.getByText("The two passwords don't match.").waitFor();
+  await fresh.getByLabel("New password (10+ characters)").fill("short");
+  await fresh.getByLabel("Confirm new password").fill("short");
+  await fresh.getByRole("button", { name: "Change password" }).click();
+  await fresh.getByText("Use a password of at least 10 characters.").waitFor();
+  check("a mismatched or too-short password is refused and the form stays open", await fresh.getByRole("button", { name: "Change password" }).isVisible());
+
+  await fresh.screenshot({ path: __dirname + "/reset-form-390.png" });
+  await fresh.getByLabel("New password (10+ characters)").fill(NEW_PW);
+  await fresh.getByLabel("Confirm new password").fill(NEW_PW);
+  await fresh.getByRole("button", { name: "Change password" }).click();
+  await fresh.getByText("Password changed. Log in with your new password.").waitFor();
+  check("after resetting, the user lands on /login with a notice", fresh.url().endsWith("/login"));
+
+  await fresh.getByLabel("Email").fill(amaEmail);
+  await fresh.getByLabel(/Password/).fill(PW);
+  await fresh.getByRole("button", { name: "Log in" }).click();
+  await fresh.getByText("Email or password is incorrect.").waitFor();
+  check("the old password no longer works", fresh.url().endsWith("/login"));
+  await fresh.getByLabel(/Password/).fill(NEW_PW);
+  await fresh.getByRole("button", { name: "Log in" }).click();
+  await fresh.getByRole("heading", { name: "Your tabs" }).waitFor();
+  check("the new password works", true);
+
+  await phone.reload();
+  await phone.waitForURL(/\/login/);
+  await ama.reload();
+  await ama.waitForURL(/\/login/);
+  check("Ama's other sessions were logged out by the reset", phone.url().includes("/login") && ama.url().includes("/login"));
+
+  // The used link is dead and says what to do next.
+  await fresh.getByRole("button", { name: "Log out" }).click();
+  await fresh.goto(link);
+  await fresh.getByLabel("New password (10+ characters)").fill(NEW_PW + "2");
+  await fresh.getByLabel("Confirm new password").fill(NEW_PW + "2");
+  await fresh.getByRole("button", { name: "Change password" }).click();
+  await fresh.getByText(/This reset link is invalid or has expired/).waitFor();
+  await fresh.getByRole("link", { name: "Request a new link" }).waitFor();
+  check("a used link shows 'invalid or expired' with a 'Request a new link' action", true);
+  await fresh.screenshot({ path: __dirname + "/reset-invalid-390.png" });
+  await fresh.goto(`${BASE}/reset`);
+  await fresh.getByRole("link", { name: "Request a new link" }).waitFor();
+  check("opening /reset with no token shows the same dead-end state", true);
+  check("the token never appeared in any request URL the browser made", !requestedUrls.some((u) => u.includes(token)));
+  const overflow = await fresh.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
+  check("reset pages fit a 390px screen without sideways scrolling", !overflow);
+
   check("no console errors (CSP or runtime)", consoleErrors.length === 0);
   if (consoleErrors.length) console.log(consoleErrors);
 
