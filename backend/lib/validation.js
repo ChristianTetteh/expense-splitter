@@ -9,6 +9,7 @@ const MAX_PAYMENTS_PER_GROUP = 5000;
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const INVITE_TOKEN_RE = /^[A-Za-z0-9_-]{32}$/;
+const RESET_TOKEN_RE = /^[A-Za-z0-9_-]{43}$/;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // Strips control characters, zero-width characters and Unicode bidi
@@ -27,6 +28,11 @@ function cleanText(value) {
 
 function isUuid(value) {
   return typeof value === "string" && UUID_RE.test(value);
+}
+
+// Reset tokens are 32 random bytes as base64url: always exactly 43 characters.
+function isResetToken(value) {
+  return typeof value === "string" && RESET_TOKEN_RE.test(value);
 }
 
 function isInviteToken(value) {
@@ -82,14 +88,19 @@ function validateSignup(body = {}) {
   const problem = nameProblem(displayName);
   if (problem) return { error: problem };
 
-  const password = body.password;
-  if (typeof password !== "string" || password.length < 10) {
-    return { error: "Use a password of at least 10 characters." };
-  }
-  if (password.length > 200) return { error: "That password is too long (200 characters max)." };
-  if (password.toLowerCase() === email) return { error: "Your password can't be your email address." };
+  const passwordProblem = passwordError(body.password, email);
+  if (passwordProblem) return { error: passwordProblem };
 
-  return { email, displayName, password };
+  return { email, displayName, password: body.password };
+}
+
+// The one set of password rules, shared by signup and password reset.
+// `email` must already be normalised (trimmed, lower-case).
+function passwordError(password, email) {
+  if (typeof password !== "string" || password.length < 10) return "Use a password of at least 10 characters.";
+  if (password.length > 200) return "That password is too long (200 characters max).";
+  if (password.toLowerCase() === email) return "Your password can't be your email address.";
+  return null;
 }
 
 function validateLogin(body = {}) {
@@ -173,6 +184,8 @@ module.exports = {
   isInviteToken,
   parsePositiveInt,
   normalizeEmail,
+  passwordError,
+  isResetToken,
   validateSignup,
   validateLogin,
   validateGroupName,

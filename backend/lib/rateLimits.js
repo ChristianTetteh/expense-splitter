@@ -1,6 +1,7 @@
 const rateLimit = require("express-rate-limit");
 const { normalizeEmail } = require("./validation");
 const { isKnownAddress } = require("./loginAddresses");
+const { GENERIC_FORGOT_MESSAGE } = require("./passwordReset");
 
 const FIFTEEN_MIN = 15 * 60 * 1000;
 const HOUR = 60 * 60 * 1000;
@@ -56,6 +57,38 @@ const loginAccountLimiter = limiter({
   message: "This account has had too many failed sign-in attempts from new places. Try again in an hour, or from a network you've used before.",
 });
 
+// "Forgot password" must answer exactly the same whether or not the email has
+// an account AND whether or not a limit was hit, so neither limiter ever
+// shows a 429 or RateLimit-* headers. Past the per-address limit the request
+// is simply answered with the usual message and ignored.
+const forgotIpLimiter = limiter({
+  windowMs: FIFTEEN_MIN,
+  max: 5,
+  standardHeaders: false,
+  handler: (req, res) => res.status(200).json({ message: GENERIC_FORGOT_MESSAGE }),
+});
+
+// 3 emails an hour to one address, so nobody can use Tally to flood an
+// inbox. Past that the request still gets the usual answer, but flags the
+// request so the route sends nothing.
+const forgotEmailLimiter = limiter({
+  windowMs: HOUR,
+  max: 3,
+  standardHeaders: false,
+  keyGenerator: (req) => `forgot-email:${emailOf(req)}`,
+  handler: (req, res, next) => {
+    req.mailSilenced = true;
+    next();
+  },
+});
+
+// Submitting new passwords with (guessed) reset tokens: 10 per 15 minutes per address.
+const resetIpLimiter = limiter({
+  windowMs: FIFTEEN_MIN,
+  max: 10,
+  message: "Too many attempts. Try again in a few minutes.",
+});
+
 // Every logged-in write (expenses, payments, joins…), per account.
 const userWriteLimiter = limiter({
   windowMs: FIFTEEN_MIN,
@@ -76,6 +109,9 @@ module.exports = {
   authIpLimiter,
   loginPairLimiter,
   loginAccountLimiter,
+  forgotIpLimiter,
+  forgotEmailLimiter,
+  resetIpLimiter,
   userWriteLimiter,
   generalLimiter,
 };
