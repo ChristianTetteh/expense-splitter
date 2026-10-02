@@ -511,3 +511,232 @@ button, input, select {
   .site-header { flex-direction: column; gap: 2px; padding: 18px 16px 4px; }
   .participant-checks { gap: 8px 14px; }
 }
+
+/* ---------- Accounts & tab management ---------- */
+
+.small { font-size: 0.82rem; }
+.center { text-align: center; }
+
+.header-user {
+  margin-left: auto;
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  font-size: 0.85rem;
+}
+.header-user-name { color: var(--muted); }
+
+.pad-narrow { max-width: 460px; margin: 28px auto 0; }
+
+.pad-switch {
+  margin: 24px 0 0;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+.pad-switch a { color: var(--stamp); }
+
+.btn-link { display: inline-block; text-decoration: none; }
+
+.notice {
+  background: var(--bg);
+  border-left: 3px solid var(--stamp);
+  padding: 12px 14px;
+  margin: 0;
+}
+
+.crumb { margin: 0 0 4px; font-size: 0.85rem; }
+.crumb a { color: var(--muted); text-decoration: none; }
+.crumb a:hover { color: var(--ink); }
+
+/* Your tabs */
+
+.tabs-section { margin: 8px 0 34px; }
+
+.section-title {
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  margin: 0 0 14px;
+}
+
+.tab-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+
+.tab-card {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 14px;
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  padding: 14px 16px;
+  text-decoration: none;
+  border-radius: 3px 14px 3px 14px;
+}
+.tab-card:hover { border-color: var(--muted); }
+.tab-card-name { font-family: var(--font-display); font-weight: 700; }
+.tab-card-meta { grid-column: 1; font-size: 0.8rem; color: var(--muted); }
+.tab-card-standing {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: center;
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  text-align: right;
+}
+
+.member-chip.is-me { color: var(--ink); border-style: solid; }
+
+/* Owner panel */
+
+.panel-label {
+  font-family: var(--font-display);
+  font-size: 0.78rem;
+  color: var(--muted);
+  margin: 0 0 8px;
+}
+
+.owner-panel .panel-label:not(:first-of-type) { margin-top: 18px; }
+
+.invite-row { display: flex; gap: 8px; align-items: center; }
+.invite-input {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  background: var(--bg);
+  border: 1px solid var(--rule);
+  padding: 7px 8px;
+}
+
+.link-btn.inline { padding: 0; font-size: inherit; }
+.link-btn:disabled, .btn-ghost-sm:disabled { opacity: 0.55; cursor: not-allowed; }
+.link-btn.danger { color: var(--debit); }
+
+.request-list { list-style: none; margin: 0; padding: 0; }
+.request-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--rule);
+  flex-wrap: wrap;
+}
+.request-row:last-child { border-bottom: none; }
+.request-who { display: flex; flex-direction: column; min-width: 0; overflow-wrap: anywhere; }
+.request-actions { display: flex; gap: 10px; align-items: center; }
+
+.people-detail { margin-top: 16px; }
+.people-detail summary { cursor: pointer; color: var(--muted); font-size: 0.85rem; }
+
+/* Expense history */
+
+.item-row.is-voided .item-desc,
+.item-row.is-voided .item-amount { text-decoration: line-through; color: var(--muted); }
+.void-note { color: var(--debit); }
+
+.plain-fieldset { border: none; margin: 0; padding: 0; min-width: 0; }
+.plain-fieldset legend { font-size: 0.85rem; color: var(--muted); padding: 0; margin-bottom: 8px; }
+
+/* Settle up */
+
+.my-standing {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.05rem;
+  margin: 0 0 16px;
+}
+
+.confirm-box {
+  background: var(--paper);
+  border: 1.5px solid var(--stamp);
+  padding: 12px 14px;
+  margin: 0 0 18px;
+  border-radius: 3px 14px 3px 14px;
+}
+
+.row-actions { display: flex; gap: 10px; align-items: center; width: 100%; justify-content: flex-end; }
+
+.pending-list { margin-top: 10px; }
+.pending-list .settle-row { justify-content: space-between; font-size: 0.85rem; }
+
+.rules-note { margin: 18px 0 0; }
+
+.payment-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0 6px;
+}
+.payment-form select,
+.payment-form input {
+  border: none;
+  border-bottom: 1.5px dashed var(--rule);
+  background: transparent;
+  padding: 6px 2px;
+}
+.payment-form input { width: 90px; }
+
+.history-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 0;
+  font-size: 0.88rem;
+}
+.history-amount { font-family: var(--font-display); white-space: nowrap; }
+.history-row.status-declined .history-amount,
+.history-row.status-voided .history-amount { text-decoration: line-through; color: var(--muted); }
+
+.leave-section { max-width: 480px; margin: 36px auto 0; text-align: center; }
+
+.confirm-inline {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+@media (max-width: 480px) {
+  .header-user { margin-left: 0; }
+  .tab-card { grid-template-columns: 1fr; }
+  .tab-card-standing { grid-column: 1; grid-row: auto; text-align: left; }
+}
+
+/* ---------- Consent: charges & payments waiting on you ---------- */
+
+.needs-you {
+  max-width: 480px;
+  margin: 18px auto 0;
+  background: var(--paper);
+  border: 1.5px solid var(--stamp);
+  padding: 14px 16px;
+  border-radius: 3px 14px 3px 14px;
+}
+
+.share-status { display: inline-flex; flex-wrap: wrap; gap: 4px 6px; margin-left: 6px; }
+.share-pill {
+  font-size: 0.72rem;
+  border: 1px dashed var(--rule);
+  padding: 0 6px;
+  white-space: nowrap;
+}
+.share-pill.status-pending { color: var(--muted); }
+.share-pill.status-declined { color: var(--debit); border-color: var(--debit); }
+
+.needs-badge {
+  display: block;
+  font-family: var(--font-body);
+  font-size: 0.72rem;
+  color: var(--stamp);
+  font-weight: 600;
+}
+
+.counted-note {
+  display: block;
+  font-family: var(--font-body);
+  font-size: 0.7rem;
+  color: var(--muted);
+  text-align: right;
+}
+.total-note { margin: 6px 0 0; text-align: right; }
+.share-pill.status-withdrawn { color: var(--muted); text-decoration: line-through; }
+.dispute-row strong { color: var(--debit); }

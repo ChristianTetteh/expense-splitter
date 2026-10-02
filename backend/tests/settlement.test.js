@@ -32,6 +32,27 @@ describe("computeBalances", () => {
     expect(byId[3].netCents).toBe(0 - (1000 + 750)); // paid nothing, owes 1750
   });
 
+  it("applies confirmed repayments: the sender's balance rises, the receiver's falls, total stays zero", () => {
+    const expenses = [{ payer_id: 1, amount_cents: 3000 }];
+    const participants = [
+      { member_id: 1, share_cents: 1000 },
+      { member_id: 2, share_cents: 1000 },
+      { member_id: 3, share_cents: 1000 },
+    ];
+    // Kwesi pays Ama back in full; Esi pays back half.
+    const payments = [
+      { from_member_id: 2, to_member_id: 1, amount_cents: 1000 },
+      { from_member_id: 3, to_member_id: 1, amount_cents: 500 },
+    ];
+    const balances = computeBalances(members, expenses, participants, payments);
+    const byId = Object.fromEntries(balances.map((b) => [b.memberId, b.netCents]));
+    expect(byId).toEqual({ 1: 500, 2: 0, 3: -500 });
+    expect(balances.reduce((sum, b) => sum + b.netCents, 0)).toBe(0);
+    expect(computeSettlement(balances)).toEqual([
+      { fromId: 3, fromName: "Esi", toId: 1, toName: "Ama", amountCents: 500 },
+    ]);
+  });
+
   it("gives everyone a zero balance when nothing's been spent", () => {
     const balances = computeBalances(members, [], []);
     expect(balances.every((b) => b.netCents === 0)).toBe(true);

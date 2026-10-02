@@ -11,21 +11,39 @@
 // owed money overall; netCents < 0 means they owe money overall. The sum of
 // every netCents is always exactly 0 — every cent paid is split among some
 // set of participants, so total paid === total owed across the group.
-function computeBalances(members, expenseRows, participantRows) {
+//
+// `paymentRows` is [{from_member_id, to_member_id, amount_cents}, ...] —
+// CONFIRMED repayments only (callers must filter out pending/declined/voided
+// ones). Handing someone money moves your balance up and theirs down by the
+// same amount, so the group total still nets to exactly zero.
+function computeBalances(members, expenseRows, participantRows, paymentRows = []) {
   const paid = new Map(members.map((m) => [m.id, 0]));
   const owed = new Map(members.map((m) => [m.id, 0]));
+  const sent = new Map(members.map((m) => [m.id, 0]));
+  const received = new Map(members.map((m) => [m.id, 0]));
+  const add = (map, id, cents) => map.set(id, (map.get(id) || 0) + cents);
 
-  for (const row of expenseRows) {
-    paid.set(row.payer_id, (paid.get(row.payer_id) || 0) + row.amount_cents);
-  }
-  for (const row of participantRows) {
-    owed.set(row.member_id, (owed.get(row.member_id) || 0) + row.share_cents);
+  for (const row of expenseRows) add(paid, row.payer_id, row.amount_cents);
+  for (const row of participantRows) add(owed, row.member_id, row.share_cents);
+  for (const row of paymentRows) {
+    add(sent, row.from_member_id, row.amount_cents);
+    add(received, row.to_member_id, row.amount_cents);
   }
 
   return members.map((m) => {
     const paidCents = paid.get(m.id) || 0;
     const owedCents = owed.get(m.id) || 0;
-    return { memberId: m.id, name: m.name, paidCents, owedCents, netCents: paidCents - owedCents };
+    const sentCents = sent.get(m.id) || 0;
+    const receivedCents = received.get(m.id) || 0;
+    return {
+      memberId: m.id,
+      name: m.name,
+      paidCents,
+      owedCents,
+      sentCents,
+      receivedCents,
+      netCents: paidCents - owedCents + sentCents - receivedCents,
+    };
   });
 }
 

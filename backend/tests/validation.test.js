@@ -1,91 +1,130 @@
-const { validateGroupInput, validateNewMember, validateExpenseInput } = require("../lib/validation");
+const {
+  cleanText,
+  isUuid,
+  isInviteToken,
+  parsePositiveInt,
+  validateSignup,
+  validateLogin,
+  validateGroupName,
+  validateExpenseInput,
+  validatePaymentInput,
+} = require("../lib/validation");
 
-describe("validateGroupInput", () => {
-  it("accepts a valid group and trims/cleans names", () => {
-    const result = validateGroupInput({ name: "  Accra Trip  ", members: ["  Ama  ", "Kwesi"] });
-    expect(result.error).toBeUndefined();
-    expect(result.name).toBe("Accra Trip");
-    expect(result.members).toEqual(["Ama", "Kwesi"]);
+describe("cleanText", () => {
+  it("strips control characters, zero-width characters and bidi overrides", () => {
+    // U+202E (right-to-left override) can make "Taxi 05$" render as "$50 ixaT".
+    expect(cleanText(`Taxi${String.fromCharCode(0x202e)} 05$`)).toBe("Taxi 05$");
+    expect(cleanText(`Din${String.fromCharCode(0x200b)}ner${String.fromCharCode(7)}`)).toBe("Dinner");
+    expect(cleanText("  lots   of\n\tspace ")).toBe("lots of space");
   });
-
-  it("rejects a name that's too short or too long", () => {
-    expect(validateGroupInput({ name: "A", members: ["Ama", "Kwesi"] }).error).toBeTruthy();
-    expect(validateGroupInput({ name: "x".repeat(81), members: ["Ama", "Kwesi"] }).error).toBeTruthy();
-  });
-
-  it("rejects fewer than 2 members", () => {
-    expect(validateGroupInput({ name: "Trip", members: [] }).error).toBeTruthy();
-    expect(validateGroupInput({ name: "Trip", members: ["Ama"] }).error).toBeTruthy();
-  });
-
-  it("rejects more than the max member count", () => {
-    const members = Array.from({ length: 31 }, (_, i) => `Member${i}`);
-    expect(validateGroupInput({ name: "Trip", members }).error).toBeTruthy();
-  });
-
-  it("rejects duplicate member names, case-insensitively", () => {
-    expect(validateGroupInput({ name: "Trip", members: ["Ama", "ama"] }).error).toBeTruthy();
-  });
-
-  it("rejects a blank member name", () => {
-    expect(validateGroupInput({ name: "Trip", members: ["Ama", "   "] }).error).toBeTruthy();
+  it("returns '' for non-strings", () => {
+    expect(cleanText(42)).toBe("");
+    expect(cleanText({ toString: () => "x" })).toBe("");
   });
 });
 
-describe("validateNewMember", () => {
-  it("accepts a new, non-duplicate name", () => {
-    const result = validateNewMember({ name: "Efua" }, new Set(["ama", "kwesi"]));
-    expect(result.name).toBe("Efua");
+describe("id/token parsers", () => {
+  it("accepts only well-formed UUIDs", () => {
+    expect(isUuid("3f2b8c1e-9a4d-4e2f-8b1a-0c9d8e7f6a5b")).toBe(true);
+    expect(isUuid("1")).toBe(false);
+    expect(isUuid("' OR 1=1 --")).toBe(false);
+  });
+  it("accepts only 32-char base64url invite tokens", () => {
+    expect(isInviteToken("A".repeat(32))).toBe(true);
+    expect(isInviteToken("A".repeat(31))).toBe(false);
+    expect(isInviteToken("A".repeat(31) + "/")).toBe(false);
+  });
+  it("parses positive int ids strictly", () => {
+    expect(parsePositiveInt("12")).toBe(12);
+    expect(parsePositiveInt(12)).toBe(12);
+    for (const bad of ["0", "-1", "1.5", "1e3", "12abc", "", null, undefined, 1.5, "9999999999"]) {
+      expect(parsePositiveInt(bad)).toBeNull();
+    }
+  });
+});
+
+describe("validateSignup", () => {
+  const good = { email: " Ama@Example.com ", display_name: "Ama", password: "correct horse battery" };
+  it("normalises email and accepts a good signup", () => {
+    expect(validateSignup(good)).toEqual({ email: "ama@example.com", displayName: "Ama", password: good.password });
+  });
+  it("reserves names that could impersonate the viewer or the UI's own labels", () => {
+    const cyrillicO = String.fromCharCode(0x043e);
+    const fullwidthYou = [0xff59, 0xff4f, 0xff55].map((c) => String.fromCharCode(c)).join("");
+    for (const display_name of ["you", "You", " YOU ", "me", "Ama (2)", "Kwesi ★", "<b>x</b>", `y${cyrillicO}u`, fullwidthYou]) {
+      expect(validateSignup({ ...good, display_name }).error).toBeDefined();
+    }
   });
 
-  it("rejects a name already in the group, case-insensitively", () => {
-    expect(validateNewMember({ name: "AMA" }, new Set(["ama"])).error).toBeTruthy();
+  it("still accepts real names in any single alphabet", () => {
+    for (const display_name of ["Ama", "José", "Ерлан", "Γιώργος", "小明", "Ama-Kofi", "O'Neil"]) {
+      expect(validateSignup({ ...good, display_name }).error).toBeUndefined();
+    }
+  });
+
+  it("rejects bad emails, names and weak/oversized passwords", () => {
+    expect(validateSignup({ ...good, email: "nope" }).error).toBeDefined();
+    expect(validateSignup({ ...good, display_name: "   " }).error).toBeDefined();
+    expect(validateSignup({ ...good, password: "short" }).error).toBeDefined();
+    expect(validateSignup({ ...good, password: "x".repeat(201) }).error).toBeDefined();
+    expect(validateSignup({ ...good, password: ["array"] }).error).toBeDefined();
+    expect(validateSignup({ ...good, password: "ama@example.com" }).error).toBeDefined();
+  });
+});
+
+describe("validateLogin", () => {
+  it("gives the same generic message for every malformed input", () => {
+    expect(validateLogin({}).error).toBe("Email or password is incorrect.");
+    expect(validateLogin({ email: "a@b.co", password: { $ne: null } }).error).toBe("Email or password is incorrect.");
+  });
+});
+
+describe("validateGroupName", () => {
+  it("enforces 2–80 characters after cleaning", () => {
+    expect(validateGroupName({ name: " Trip " })).toEqual({ name: "Trip" });
+    expect(validateGroupName({ name: "a" }).error).toBeDefined();
+    expect(validateGroupName({ name: "x".repeat(81) }).error).toBeDefined();
   });
 });
 
 describe("validateExpenseInput", () => {
-  const memberIds = new Set([1, 2, 3]);
-
-  it("accepts a valid expense and defaults participants to the whole group", () => {
-    const result = validateExpenseInput({ description: "Dinner", amount: "30.00", payer_id: 1 }, memberIds);
-    expect(result.error).toBeUndefined();
-    expect(result.description).toBe("Dinner");
-    expect(result.amountCents).toBe(3000);
-    expect(result.payerId).toBe(1);
-    expect(result.participantIds.sort()).toEqual([1, 2, 3]);
+  const active = new Set([1, 2, 3]);
+  it("never takes a payer from the request", () => {
+    const r = validateExpenseInput({ description: "Dinner", amount: "30", participant_ids: [3, 1, 1], payer_id: 2 }, active);
+    expect(r).toEqual({ description: "Dinner", amountCents: 3000, participantIds: [1, 3] });
+    expect(r.payerId).toBeUndefined();
   });
-
-  it("accepts an explicit, smaller participant list", () => {
-    const result = validateExpenseInput(
-      { description: "Taxi", amount: "15", payer_id: 2, participant_ids: [2, 3] },
-      memberIds
-    );
-    expect(result.participantIds).toEqual([2, 3]);
+  it("rejects participants outside the tab", () => {
+    expect(validateExpenseInput({ description: "x", amount: "1", participant_ids: [1, 99] }, active).error).toBeDefined();
   });
-
-  it("rejects an empty description", () => {
-    expect(validateExpenseInput({ description: "  ", amount: "10", payer_id: 1 }, memberIds).error).toBeTruthy();
+  it("requires an explicit, non-empty participant list", () => {
+    expect(validateExpenseInput({ description: "x", amount: "1" }, active).error).toBeDefined();
+    expect(validateExpenseInput({ description: "x", amount: "1", participant_ids: [] }, active).error).toBeDefined();
   });
-
-  it("rejects an invalid amount", () => {
-    expect(validateExpenseInput({ description: "X", amount: "0", payer_id: 1 }, memberIds).error).toBeTruthy();
-    expect(validateExpenseInput({ description: "X", amount: "abc", payer_id: 1 }, memberIds).error).toBeTruthy();
+  it("rejects amounts too small to give everyone at least a cent", () => {
+    expect(validateExpenseInput({ description: "x", amount: "0.02", participant_ids: [1, 2, 3] }, active).error).toMatch(/at least \$0\.01/);
+    expect(validateExpenseInput({ description: "x", amount: "0.03", participant_ids: [1, 2, 3] }, active).error).toBeUndefined();
   });
-
-  it("rejects a payer who isn't in the group", () => {
-    expect(validateExpenseInput({ description: "X", amount: "10", payer_id: 99 }, memberIds).error).toBeTruthy();
+  it("rejects negative, zero, huge and malformed amounts", () => {
+    for (const amount of ["-5", "0", "0.00", "1000000.01", "1.234", "abc", "1e5", null, 5, 12.345]) {
+      expect(validateExpenseInput({ description: "x", amount, participant_ids: [1] }, active).error).toBeDefined();
+    }
   });
+});
 
-  it("rejects an empty participant list", () => {
-    expect(
-      validateExpenseInput({ description: "X", amount: "10", payer_id: 1, participant_ids: [] }, memberIds).error
-    ).toBeTruthy();
+describe("validatePaymentInput", () => {
+  const active = new Set([1, 2]);
+  it("accepts sent/received to another current member", () => {
+    expect(validatePaymentInput({ direction: "sent", counterparty_id: 2, amount: "5" }, 1, active)).toEqual({
+      direction: "sent",
+      counterpartyId: 2,
+      amountCents: 500,
+    });
   });
-
-  it("rejects a participant who isn't in the group", () => {
-    expect(
-      validateExpenseInput({ description: "X", amount: "10", payer_id: 1, participant_ids: [1, 99] }, memberIds)
-        .error
-    ).toBeTruthy();
+  it("rejects paying yourself, unknown people, bad directions and bad amounts", () => {
+    expect(validatePaymentInput({ direction: "sent", counterparty_id: 1, amount: "5" }, 1, active).error).toBeDefined();
+    expect(validatePaymentInput({ direction: "sent", counterparty_id: 9, amount: "5" }, 1, active).error).toBeDefined();
+    expect(validatePaymentInput({ direction: "gift", counterparty_id: 2, amount: "5" }, 1, active).error).toBeDefined();
+    expect(validatePaymentInput({ direction: "sent", counterparty_id: 2, amount: "-5" }, 1, active).error).toBeDefined();
   });
 });
