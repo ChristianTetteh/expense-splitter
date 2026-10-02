@@ -92,6 +92,27 @@ and **nobody can leave with anything unresolved**.
   a keyed hash) are exempt from that ceiling, so a stranger hammering your email can't lock you out
   of your usual connection. There's also a per-account limit on writes.
 
+### Password reset
+
+| Attempt | What happens |
+|---|---|
+| Find out whether an email has an account through "Forgot password" | Impossible. `POST /api/auth/forgot` gives the same `200` and message for a known email, an unknown one, malformed input and a rate-limited request. The lookup and the email happen after the response is sent, so timing doesn't differ either. |
+| Steal a reset link from the database or logs | The database holds only the SHA-256 of each token. The link carries the token in the URL fragment (`/reset#...`), which browsers never send to a server, so it isn't in access logs or `Referer` headers. The page removes it from the address bar as soon as it loads. |
+| Poison the link with a forged `Host` / `X-Forwarded-Host` | The link is built from the `APP_ORIGIN` setting only, never from the request. |
+| Guess a token | 256 random bits, and `/api/auth/reset` allows 10 tries per address per 15 minutes. |
+| Reuse a link, or use an old one after asking for a new one | Links work once, for 30 minutes. A new request retires earlier links; using a link retires the rest. Unknown, used and expired links all get the same `400`. |
+| Race two submits of one link | The reset row is locked `FOR UPDATE` inside the transaction, so exactly one wins. |
+| Keep a stolen session after the owner resets | Resetting deletes **every** session of that account. It also doesn't log the person in; they log in again with the new password. |
+| Use a weak password through the reset form | The same rules as signup apply (10+ characters, not the email). A rejected password leaves the link usable. |
+| Flood someone's inbox | 5 requests per address per 15 minutes and 3 per email per hour. Past either limit the answer is unchanged and nothing is sent. |
+
+Reset email is sent through [Brevo](https://www.brevo.com/)'s REST API (`backend/lib/mailer.js`,
+built-in `fetch`, no extra dependency). It needs `BREVO_API_KEY`, `MAIL_FROM` (a sender verified in
+Brevo) and optionally `MAIL_FROM_NAME`. Without a key, nothing is sent: in development the message
+and link are printed to the server console; in production a warning is logged and the request still
+gets its normal answer. Turn off Brevo's click and open tracking for transactional mail so links
+aren't rewritten through a third party.
+
 ### Request forgery, XSS and the rest
 
 - **The API only answers through the frontend's proxy.** Vercel Routing Middleware
@@ -117,10 +138,14 @@ and **nobody can leave with anything unresolved**.
 
 ### Known limits (honest list)
 
-- **No email verification.** There's no email service, so an address isn't proven to belong to
-  whoever signed up with it. That's why owners see each requester's email and approve them
-  personally, and why an invite link only lets someone *ask*. It also means there's no "forgot
-  password" reset.
+- **No email verification at signup.** An address isn't proven to belong to whoever signed up with
+  it. That's why owners see each requester's email and approve them personally, and why an invite
+  link only lets someone *ask*.
+- **Password reset needs the mail provider configured.** Without `BREVO_API_KEY` and `MAIL_FROM`
+  set on the server, "Forgot your password?" looks like it worked but no email is sent. Anyone who
+  controls the inbox of the account's email can reset the password, as with any email-based reset.
+  Someone who knows your email can use up its 3 requests an hour, which delays your reset email
+  but never reveals anything or changes your password.
 - **Software can't make anyone hand over money.** A determined debtor can dispute a real charge
   and refuse to budge. What Tally guarantees is that they can't do it quietly or walk away from it:
   the dispute is visible to everyone, attributed, and keeps them in the tab until it's resolved.
@@ -176,7 +201,7 @@ cd backend
 npm test
 ```
 
-97 tests. The security tests run against a **real Postgres database** (not mocks), so they exercise
+125 tests. The security tests run against a **real Postgres database** (not mocks), so they exercise
 the actual queries, locks and constraints:
 
 - `tests/auth.test.js`: hashing, cookie flags, hashed session storage, logout revocation,
@@ -193,11 +218,19 @@ the actual queries, locks and constraints:
   leave-vs-bill race
 - `tests/rateLimits.test.js`: requests without the proxy secret are refused; `X-Forwarded-For`
   can't be used to dodge limits; known addresses can't be locked out; distributed guessing is capped
+- `tests/passwordReset.test.js` (mailer mocked): identical answers for known, unknown and malformed
+  emails; mail only for real accounts; link host from `APP_ORIGIN` even with forged `Host` headers;
+  token stored only as a hash; expiry; single use; a new request retires the old link; the password
+  changes and all sessions are revoked; weak passwords leave the link usable; garbage tokens; a
+  concurrent double submit has exactly one winner; silent and 429 rate limits; CSRF guard
+- `tests/mailer.test.js`: Brevo request shape, never throws, never logs the key, dev/production
+  behaviour without a key, dev-only outbox file (all with `fetch` stubbed)
 - `tests/money.test.js`, `tests/settlement.test.js`, `tests/validation.test.js`: the pure logic
 
-The full browser flow was also run end-to-end (20 checks) in headless Chromium with the
+The full browser flow was also run end-to-end (33 checks) in headless Chromium with the
 production CSP applied: invite → approve → accept a charge → fake-expense attempt declined →
-payment claim → confirm → dispute blocks leaving → withdraw → leave. The security design was
+payment claim → confirm → dispute blocks leaving → withdraw → leave; then forgot password →
+emailed link → new password → old password refused, new accepted, other sessions logged out. The security design was
 reviewed twice by an independent reviewer; every finding is fixed and covered by a test.
 
 ## API overview
@@ -207,6 +240,7 @@ All routes except `/api/auth/*` and `/api/health` need a session. All writes are
 | Route | Who | What |
 |---|---|---|
 | `POST /api/auth/signup` · `login` · `logout`, `GET /api/auth/me` | anyone | Accounts and sessions |
+| `POST /api/auth/forgot` `{ email }` · `POST /api/auth/reset` `{ token, password }` | anyone | Password reset by email |
 | `GET /api/groups` | you | Tabs you're in, with your balance in each |
 | `POST /api/groups` | you | Start a tab `{ name }` |
 | `GET /api/groups/:id` | member | The whole tab: people, expenses, payments, balances, settlement |
@@ -237,6 +271,8 @@ after 30 days unless upgraded.
 - `NODE_ENV=production`: turns on `Secure` / `__Host-` cookies
 - `APP_ORIGIN=https://<your-frontend>`
 - `PROXY_SECRET`: a long random string shared with the frontend
+- `BREVO_API_KEY`, `MAIL_FROM`, `MAIL_FROM_NAME`: password-reset email (see above). Optional for
+  the server to start, but without the first two nobody can reset a password.
 - The server refuses to start in production without `APP_ORIGIN` and `PROXY_SECRET`.
 
 **Frontend:** Vercel with root directory `frontend`. Environment variables: `BACKEND_ORIGIN`
