@@ -13,6 +13,7 @@ They run against a real PostgreSQL database, not mocks, so they exercise the rea
 
 ```bash
 createdb tally_test
+# default connection is the local socket; for another server set TEST_DATABASE_URL=postgresql://user:pass@host:5432/tally_test
 cd backend
 npm install
 npm test        # jest --runInBand

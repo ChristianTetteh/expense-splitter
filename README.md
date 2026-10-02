@@ -171,6 +171,7 @@ See [TESTING.md](TESTING.md) for the full write-up (tests, browser run, security
 
 ```bash
 createdb tally_test
+# default connection is the local socket; for another server set TEST_DATABASE_URL=postgresql://user:pass@host:5432/tally_test
 cd backend
 npm test
 ```
