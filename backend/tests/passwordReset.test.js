@@ -137,6 +137,14 @@ describe("POST /api/auth/forgot", () => {
     expect((await reset(second, NEW_PASSWORD)).status).toBe(200);
   });
 
+  it("two simultaneous requests leave exactly one live link", async () => {
+    const { email, id } = await makeUser();
+    await Promise.all([forgot(email), forgot(email)]);
+    expect(mailer.sendMail).toHaveBeenCalledTimes(2);
+    const live = (await pool.query("SELECT 1 FROM password_resets WHERE user_id = $1 AND used_at IS NULL", [id])).rows;
+    expect(live).toHaveLength(1);
+  });
+
   it("is rate limited to 5 per address per 15 minutes, silently: same answer, nothing sent", async () => {
     const { email } = await makeUser();
     const ip = "198.51.100.77";

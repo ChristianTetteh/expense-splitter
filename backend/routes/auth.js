@@ -100,6 +100,9 @@ async function sendResetEmail(email) {
 
   const token = newResetToken();
   await pool.withTransaction(async (client) => {
+    // Serialise concurrent requests for the same account, so "retire the old
+    // links, add one new link" can't interleave into two live links.
+    await client.query("SELECT 1 FROM users WHERE id = $1 FOR NO KEY UPDATE", [user.id]);
     await client.query("UPDATE password_resets SET used_at = now() WHERE user_id = $1 AND used_at IS NULL", [user.id]);
     await client.query(
       "INSERT INTO password_resets (user_id, token_hash, expires_at) VALUES ($1, $2, now() + make_interval(mins => $3))",
