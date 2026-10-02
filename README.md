@@ -167,6 +167,8 @@ npm run dev              # http://localhost:5173 — proxies /api to :4002
 
 ## Testing
 
+See [TESTING.md](TESTING.md) for the full write-up (tests, browser run, security review findings and fixes).
+
 ```bash
 createdb tally_test
 cd backend
