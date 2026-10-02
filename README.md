@@ -5,8 +5,11 @@ A full-stack expense-splitter built for the "Expense Splitter Web App" intern ta
 guaranteed to add up — no floating-point drift, no rounding that leaves a cent unaccounted
 for.
 
-**Live demo:** _(added after deploy)_
-**API:** _(added after deploy)_
+**Live demo:** https://tally-splitter.vercel.app
+**API:** https://tally-backend-ys6q.onrender.com/api
+
+_The API runs on a free Render instance, so the first request after a quiet period can take
+~30–60 seconds while it wakes up._
 
 ## What's included
 
@@ -19,8 +22,7 @@ for.
   was split
 
 **Beyond the brief**
-- **No account needed** — start a tab, share its link, no login anywhere. Fictional demo data
-  only (see the note at the bottom on why).
+- **No account needed** — start a tab, share its link, no login anywhere.
 - **Multiple, independent tabs** — not just one global expense pool; each tab has its own
   roster and its own link, so this reads like a real multi-group tool rather than a single
   demo dataset.
@@ -131,18 +133,18 @@ npm test
 
 ## Deployment
 
-Same shape as this project's sibling apps — a managed Postgres instance, a Render web service,
-and a Vercel static frontend.
+A managed Postgres instance and a Render web service for the API, plus a Vercel static
+frontend.
 
-**Database:** [Supabase](https://supabase.com) (managed PostgreSQL), connected via the
-**connection pooler** (`aws-0-<region>.pooler.supabase.com:6543`), not the direct host — the
-direct host is IPv6-only and unreachable from Render's network.
+**Database:** [Render Postgres](https://render.com/docs/postgresql). The backend connects over
+Render's internal network, so use the instance's **Internal Database URL** and set
+`PGSSL=false`. (Free Render Postgres instances expire after 30 days unless upgraded.)
 
 **Backend — Render Web Service:**
 1. New → Web Service → point at the repo, build/start commands `cd backend && npm install` /
    `cd backend && npm start`
-2. Environment variables: `DATABASE_URL` (Supabase pooler string), `CORS_ORIGIN` (the deployed
-   frontend's origin), `PGSSL=true`
+2. Environment variables: `DATABASE_URL` (Internal Database URL), `CORS_ORIGIN` (the deployed
+   frontend's origin), `PGSSL=false`
 3. `npm start` runs `node migrate.js && node server.js`, so the schema is applied on every boot
    (idempotent — safe to leave permanently)
 
