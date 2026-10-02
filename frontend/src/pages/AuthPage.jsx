@@ -1,15 +1,19 @@
 import { useState } from "react";
-import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, Navigate, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { safeNext, useAuth } from "../auth";
 import { errorMessage } from "../api";
-import { Icon, TallyMark } from "../components/Icons.jsx";
+import { Icon } from "../components/Icons.jsx";
+import AuthAside from "../components/AuthAside.jsx";
 
 export default function AuthPage({ mode }) {
   const isSignup = mode === "signup";
   const { user, login, signup } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [params] = useSearchParams();
   const next = safeNext(params.get("next"));
+  // Set by the password reset page when it sends people here.
+  const notice = !isSignup && typeof location.state?.notice === "string" ? location.state.notice : "";
 
   const [email, setEmail] = useState("");
   const [displayName, setDisplayName] = useState("");
@@ -42,15 +46,7 @@ export default function AuthPage({ mode }) {
 
   return (
     <div className="page auth-page">
-      <aside className="auth-aside" aria-hidden="true">
-        <TallyMark size={56} />
-        <p className="auth-aside-title">A tab everyone has agreed to.</p>
-        <ul className="auth-aside-points">
-          <li><Icon name="check" size={18} /> A charge only counts once that person accepts it.</li>
-          <li><Icon name="check" size={18} /> A payment only counts once the receiver confirms it.</li>
-          <li><Icon name="check" size={18} /> Nothing is deleted; it all stays in the history.</li>
-        </ul>
-      </aside>
+      <AuthAside />
       <div className="pad auth-card">
         <h1 className="pad-title">{isSignup ? "Make an account" : "Log in to Tally"}</h1>
         <p className="pad-sub">
@@ -58,6 +54,13 @@ export default function AuthPage({ mode }) {
             ? "Your tabs are private: only people you let in can see them, and nobody can log a payment in your name."
             : "See your tabs and who owes whom."}
         </p>
+
+        {notice && (
+          <p className="notice auth-notice" role="status">
+            <Icon name="check" size={20} />
+            <span>{notice}</span>
+          </p>
+        )}
 
         <form onSubmit={handleSubmit} className="pad-form">
           {isSignup && (
@@ -81,6 +84,10 @@ export default function AuthPage({ mode }) {
               autoComplete={isSignup ? "new-password" : "current-password"}
             />
           </label>
+
+          {!isSignup && (
+            <Link className="pad-forgot" to="/forgot">Forgot your password?</Link>
+          )}
 
           {error && <p className="form-error" role="alert">{error}</p>}
 

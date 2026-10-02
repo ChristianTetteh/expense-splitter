@@ -33,7 +33,11 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
-  return <AuthContext.Provider value={{ user, login, signup, logout }}>{children}</AuthContext.Provider>;
+  // Drops the logged-in user from memory without a server call — used after a
+  // password reset, which revokes every session on the server.
+  const forgetUser = useCallback(() => setUser(null), []);
+
+  return <AuthContext.Provider value={{ user, login, signup, logout, forgetUser }}>{children}</AuthContext.Provider>;
 }
 
 export const useAuth = () => useContext(AuthContext);
