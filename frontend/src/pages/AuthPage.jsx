@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { safeNext, useAuth } from "../auth";
 import { errorMessage } from "../api";
+import { Icon, TallyMark } from "../components/Icons.jsx";
 
 export default function AuthPage({ mode }) {
   const isSignup = mode === "signup";
@@ -40,9 +41,17 @@ export default function AuthPage({ mode }) {
   const otherLink = `${isSignup ? "/login" : "/signup"}${next !== "/" ? `?next=${encodeURIComponent(next)}` : ""}`;
 
   return (
-    <div className="page">
-      <div className="pad pad-narrow">
-        <p className="pad-eyebrow">{isSignup ? "New here" : "Welcome back"}</p>
+    <div className="page auth-page">
+      <aside className="auth-aside" aria-hidden="true">
+        <TallyMark size={56} />
+        <p className="auth-aside-title">A tab everyone has agreed to.</p>
+        <ul className="auth-aside-points">
+          <li><Icon name="check" size={18} /> A charge only counts once that person accepts it.</li>
+          <li><Icon name="check" size={18} /> A payment only counts once the receiver confirms it.</li>
+          <li><Icon name="check" size={18} /> Nothing is deleted; it all stays in the history.</li>
+        </ul>
+      </aside>
+      <div className="pad auth-card">
         <h1 className="pad-title">{isSignup ? "Make an account" : "Log in to Tally"}</h1>
         <p className="pad-sub">
           {isSignup
