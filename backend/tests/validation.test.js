@@ -81,7 +81,11 @@ describe("validateLogin", () => {
 
 describe("validateGroupName", () => {
   it("enforces 2–80 characters after cleaning", () => {
-    expect(validateGroupName({ name: " Trip " })).toEqual({ name: "Trip" });
+    expect(validateGroupName({ name: " Trip " })).toEqual({ name: "Trip", currency: "GHS" });
+    expect(validateGroupName({ name: "Trip", currency: "USD" })).toEqual({ name: "Trip", currency: "USD" });
+    for (const bad of ["EUR", "ghs", "", null, 5, {}, ["GHS"]]) {
+      expect(validateGroupName({ name: "Trip", currency: bad }).error).toBeDefined();
+    }
     expect(validateGroupName({ name: "a" }).error).toBeDefined();
     expect(validateGroupName({ name: "x".repeat(81) }).error).toBeDefined();
   });
@@ -102,7 +106,7 @@ describe("validateExpenseInput", () => {
     expect(validateExpenseInput({ description: "x", amount: "1", participant_ids: [] }, active).error).toBeDefined();
   });
   it("rejects amounts too small to give everyone at least a cent", () => {
-    expect(validateExpenseInput({ description: "x", amount: "0.02", participant_ids: [1, 2, 3] }, active).error).toMatch(/at least \$0\.01/);
+    expect(validateExpenseInput({ description: "x", amount: "0.02", participant_ids: [1, 2, 3] }, active).error).toMatch(/at least 0\.01/);
     expect(validateExpenseInput({ description: "x", amount: "0.03", participant_ids: [1, 2, 3] }, active).error).toBeUndefined();
   });
   it("rejects negative, zero, huge and malformed amounts", () => {

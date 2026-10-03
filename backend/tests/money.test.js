@@ -8,6 +8,13 @@ describe("parseDollarsToCents", () => {
     expect(parseDollarsToCents("0.01")).toBe(1);
   });
 
+  it("accepts a leading cedi symbol or code", () => {
+    expect(parseDollarsToCents("GH₵12.50")).toBe(1250);
+    expect(parseDollarsToCents("₵ 5")).toBe(500);
+    expect(parseDollarsToCents("GHS30")).toBe(3000);
+    expect(parseDollarsToCents("GH₵")).toBeNull();
+  });
+
   it("accepts a leading dollar sign and numbers", () => {
     expect(parseDollarsToCents("$12.34")).toBe(1234);
     expect(parseDollarsToCents(12.5)).toBe(1250);

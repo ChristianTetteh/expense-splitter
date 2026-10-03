@@ -7,7 +7,7 @@ Tally handles money between people, so the tests focus on two promises:
 
 Three kinds of evidence back this up: automated backend tests, a browser end-to-end run, and two independent security reviews.
 
-## 1. Backend tests (125)
+## 1. Backend tests (131)
 
 They run against a real PostgreSQL database, not mocks, so they exercise the real queries, locks and constraints.
 
@@ -29,7 +29,7 @@ npm test        # jest --runInBand
 | `mailer.test.js` | Brevo request shape (URL, `api-key` header, JSON body, timeout signal); never throws or logs the key; development prints, production only warns (and doesn't print the link); the outbox file works outside production only. `fetch` is stubbed: nothing reaches a mail service |
 | `money.test.js`, `settlement.test.js`, `validation.test.js` | Cent-exact splitting, who-owes-whom settlement, input validation, look-alike and invisible-character names |
 
-## 2. Browser end-to-end run (33 checks)
+## 2. Browser end-to-end run (34 checks)
 
 `e2e/run.js` drives a real browser with three separate users (Ama, Kwesi and a stranger), each in their own browser session. It serves pages with the production Content-Security-Policy, so a CSP violation shows up as a failure.
 
@@ -39,7 +39,7 @@ cd e2e && npm install && npx playwright install chromium   # or point to an inst
 node run.js
 ```
 
-What it checks: logged-out redirect; open-redirect attempt through `?next=`; session cookie hidden from page scripts; invite link flow; a non-member opening a tab URL sees "Tab not found."; a requester can't see the tab before approval; the owner sees the requester's email; a new charge is pending until accepted; accepting makes the debt count on both sides; a fake expense doesn't touch the other person's debt; a decline stays visible and the debt stands; a debtor gets no "void" button on someone else's expense; a payment claim stays pending until the receiver confirms; an open dispute blocks leaving; after leaving, the tab is gone; no console errors.
+What it checks: logged-out redirect; open-redirect attempt through `?next=`; session cookie hidden from page scripts; invite link flow; a non-member opening a tab URL sees "Tab not found."; a requester can't see the tab before approval; the owner sees the requester's email; a new charge is pending until accepted; accepting makes the debt count on both sides; a fake expense doesn't touch the other person's debt; a decline stays visible and the debt stands; a debtor gets no "void" button on someone else's expense; a payment claim stays pending until the receiver confirms; an open dispute blocks leaving; after leaving, the tab is gone; a new tab is in Ghana cedis (GH₵) and a tab made in US dollars shows $ amounts; no console errors.
 
 The run finishes with the password-reset flow. The backend is started with `MAIL_OUTBOX_FILE` (honoured only outside production), which makes it append each email to a file instead of sending it; the script reads the link from there. It checks: the same confirmation for a real and an unknown email; no mail for the unknown one; the link points at the app origin with the token in the `#fragment`; the token is stripped from the address bar and never appears in any request URL; mismatched and too-short passwords are refused; success lands on `/login` with a notice; the old password fails and the new one works; Ama's other two sessions are logged out; a used link and a bare `/reset` both show "Request a new link"; no sideways scroll at 390px. Start the backend with `MAIL_OUTBOX_FILE=/tmp/claude-0/outbox.jsonl` (or set the same variable when running `run.js`).
 

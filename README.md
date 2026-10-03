@@ -30,8 +30,9 @@ _The API runs on a free Render instance, so the first request after a quiet peri
   that person accepts it. "I paid Ama" stays pending until Ama confirms she received it.
 - **Disputes, not escapes.** Declining a charge opens a dispute everyone can see, and neither
   side can leave the tab until one of them gives way.
-- **Exact-cent math, never floating point.** All arithmetic is in integer cents, so $10 split
+- **Exact-cent math, never floating point.** All arithmetic is in integer pesewas/cents, so 10.00 split
   three ways is exactly 334 + 333 + 333.
+- **Cedis by default, dollars if you prefer.** Each tab has one currency (Ghana cedis, GH₵, unless the creator picks US dollars). It is fixed when the tab is made, because there is no conversion and changing it later would silently change what the amounts mean.
 - **Uneven splits.** An expense can involve any subset of the tab.
 
 ```
@@ -201,7 +202,7 @@ cd backend
 npm test
 ```
 
-125 tests. The security tests run against a **real Postgres database** (not mocks), so they exercise
+131 tests. The security tests run against a **real Postgres database** (not mocks), so they exercise
 the actual queries, locks and constraints:
 
 - `tests/auth.test.js`: hashing, cookie flags, hashed session storage, logout revocation,

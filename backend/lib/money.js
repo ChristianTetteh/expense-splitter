@@ -1,10 +1,10 @@
 // All money math happens here, in integer cents. Nothing else in the app
-// should do arithmetic on dollar amounts directly — floating point dollars
-// is how "$10 split 3 ways" silently stops summing to $10.
+// should do arithmetic on decimal amounts directly — floating point
+// is how "10 split 3 ways" silently stops summing to $10.
 
-const MAX_CENTS = 100_000_000; // $1,000,000.00 — generous upper bound, mostly to catch fat-fingered input
+const MAX_CENTS = 100_000_000; // 1,000,000.00 in either currency — generous upper bound, mostly to catch fat-fingered input
 
-// Parses user-supplied dollar input ("12.5", "12.50", 12.5, "$12.50") into
+// Parses user-supplied dollar input ("12.5", "12.50", 12.5, "$12.50", "GH₵12.50") into
 // an integer number of cents, or returns null if it isn't a valid positive
 // amount. Rejects more than 2 decimal places rather than silently rounding
 // away a typo like "12.455".
@@ -15,7 +15,7 @@ function parseDollarsToCents(input) {
   }
   if (typeof input !== "string") return null;
 
-  const trimmed = input.trim().replace(/^\$/, "");
+  const trimmed = input.trim().replace(/^(?:GH₵|GHS|₵|\$)\s*/i, "");
   if (!/^\d+(\.\d{1,2})?$/.test(trimmed)) return null;
 
   const [wholePart, fractionPart = ""] = trimmed.split(".");

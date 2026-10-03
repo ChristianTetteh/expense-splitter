@@ -48,7 +48,7 @@ router.get(
   "/",
   asyncHandler(async (req, res) => {
     const result = await pool.query(
-      `SELECT g.id, g.name, g.created_at, (g.owner_id = $1) AS is_owner, m.id AS member_id,
+      `SELECT g.id, g.name, g.currency, g.created_at, (g.owner_id = $1) AS is_owner, m.id AS member_id,
          (SELECT count(*)::int FROM members x WHERE x.group_id = g.id AND x.left_at IS NULL) AS member_count,
          (SELECT count(*)::int FROM expense_shares s JOIN expenses e ON e.id = s.expense_id
             WHERE s.group_id = g.id AND s.member_id = m.id AND s.status = 'pending' AND e.voided_at IS NULL)
@@ -77,6 +77,7 @@ router.get(
       groups: result.rows.map((r) => ({
         id: r.id,
         name: r.name,
+        currency: r.currency,
         created_at: r.created_at,
         is_owner: r.is_owner,
         member_count: r.member_count,
@@ -90,7 +91,7 @@ router.get(
 router.post(
   "/",
   asyncHandler(async (req, res) => {
-    const { name, error } = validateGroupName(req.body);
+    const { name, currency, error } = validateGroupName(req.body);
     if (error) throw new HttpError(400, error);
 
     const groupId = await pool.withTransaction(async (client) => {
@@ -100,8 +101,8 @@ router.post(
         throw new HttpError(400, `You can be in at most ${MAX_GROUPS_PER_USER} tabs at once.`);
       }
       const g = await client.query(
-        "INSERT INTO groups (name, owner_id, invite_token) VALUES ($1, $2, $3) RETURNING id",
-        [name, req.user.id, newInviteToken()]
+        "INSERT INTO groups (name, currency, owner_id, invite_token) VALUES ($1, $2, $3, $4) RETURNING id",
+        [name, currency, req.user.id, newInviteToken()]
       );
       await client.query("INSERT INTO members (group_id, user_id) VALUES ($1, $2)", [g.rows[0].id, req.user.id]);
       return g.rows[0].id;

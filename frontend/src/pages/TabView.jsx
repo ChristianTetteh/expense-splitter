@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import api, { errorMessage, post } from "../api";
-import { formatCents } from "../utils/money";
+import { CurrencyContext, formatCents, useMoney } from "../utils/money";
 import { dateLabel } from "../utils/dates";
 import { Icon, Initial } from "../components/Icons.jsx";
 
@@ -97,6 +97,7 @@ export default function TabView() {
   }
 
   return (
+    <CurrencyContext.Provider value={group.currency}>
     <div className="page tab-page">
       <p className="crumb">
         <Link to="/"><Icon name="back" size={16} /> Your tabs</Link>
@@ -145,12 +146,12 @@ export default function TabView() {
             <div className="totals">
               <div className="total-counted">
                 <span className="total-label">Total counted</span>
-                <span className="money total-value">{formatCents(liveTotal)}</span>
+                <span className="money total-value">{formatCents(liveTotal, { currency: group.currency })}</span>
               </div>
               {uncounted > 0 && (
                 <div className="total-pending">
                   <span className="total-label">Not counted yet</span>
-                  <span className="money total-value">{formatCents(uncounted)}</span>
+                  <span className="money total-value">{formatCents(uncounted, { currency: group.currency })}</span>
                 </div>
               )}
             </div>
@@ -179,6 +180,7 @@ export default function TabView() {
         </aside>
       </div>
     </div>
+    </CurrencyContext.Provider>
   );
 }
 
@@ -295,6 +297,7 @@ function OwnerPanel({ group, members, act, busy }) {
 const SHARE_ICON = { pending: "clock", declined: "alert", withdrawn: "ban" };
 
 function ExpenseList({ expenses, members, meId, act, busy }) {
+  const { fmt } = useMoney();
   const activeIds = members.filter((m) => !m.left_at).map((m) => m.id).sort((a, b) => a - b).join(",");
   if (expenses.length === 0) {
     return (
@@ -322,7 +325,7 @@ function ExpenseList({ expenses, members, meId, act, busy }) {
       <li key={exp.id} className={`entry item-row ${state}`}>
         <div className="entry-head">
           <span className="entry-desc item-desc">{exp.description}</span>
-          <span className="money entry-amount item-amount">{formatCents(exp.amount_cents)}</span>
+          <span className="money entry-amount item-amount">{fmt(exp.amount_cents)}</span>
         </div>
         <div className="entry-sub">
           <span>{exp.payer_id === meId ? "You" : exp.payer_name} paid</span>
@@ -333,7 +336,7 @@ function ExpenseList({ expenses, members, meId, act, busy }) {
           <div className="entry-count">
             <span className="meter" aria-hidden="true" style={{ "--p": `${pct}%` }} />
             <span className="entry-counted">
-              Counted {formatCents(counted)} of {formatCents(exp.amount_cents)}
+              Counted {fmt(counted)} of {fmt(exp.amount_cents)}
             </span>
           </div>
         )}
@@ -390,6 +393,7 @@ function ExpenseList({ expenses, members, meId, act, busy }) {
 }
 
 function AddExpense({ members, meId, act, busy }) {
+  const { symbol } = useMoney();
   const [open, setOpen] = useState(false);
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState("");
@@ -452,8 +456,8 @@ function AddExpense({ members, meId, act, busy }) {
       <label className="pad-field">
         <span>Amount you paid</span>
         <span className="input-prefix">
-          <span className="prefix" aria-hidden="true">$</span>
-          <input value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" inputMode="decimal" required />
+          <span className="prefix" aria-hidden="true">{symbol}</span>
+          <input style={{ paddingLeft: symbol.length > 1 ? 56 : 30 }} value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" inputMode="decimal" required />
         </span>
       </label>
       <fieldset className="pad-field plain-fieldset">
@@ -485,6 +489,7 @@ function AddExpense({ members, meId, act, busy }) {
 // ── Balance: the hero ────────────────────────────────────────────────────
 
 function BalanceHero({ meId, myNet, settlement, payments, hasExpenses, act, busy }) {
+  const { fmt } = useMoney();
   const myClaims = payments.filter((p) => p.status === "pending" && p.recorded_by_id === meId);
   const kind = myNet > 0 ? "owed" : myNet < 0 ? "owe" : "square";
 
@@ -494,12 +499,12 @@ function BalanceHero({ meId, myNet, settlement, payments, hasExpenses, act, busy
         <p className="balance-line my-standing">
           {kind === "owed" && (
             <>
-              <span className="balance-label"><Icon name="in" size={22} />You're owed</span> <span className="balance-amount money">{formatCents(myNet)}</span>
+              <span className="balance-label"><Icon name="in" size={22} />You're owed</span> <span className="balance-amount money">{fmt(myNet)}</span>
             </>
           )}
           {kind === "owe" && (
             <>
-              <span className="balance-label"><Icon name="out" size={22} />You owe</span> <span className="balance-amount money">{formatCents(-myNet)}</span>
+              <span className="balance-label"><Icon name="out" size={22} />You owe</span> <span className="balance-amount money">{fmt(-myNet)}</span>
             </>
           )}
           {kind === "square" && (
@@ -534,12 +539,12 @@ function BalanceHero({ meId, myNet, settlement, payments, hasExpenses, act, busy
                       <span className="settle-to">{owedToMe ? "you" : t.toName}</span>
                     </span>
                   </span>
-                  <span className="settle-amount money">{formatCents(t.amountCents)}</span>
+                  <span className="settle-amount money">{fmt(t.amountCents)}</span>
                   {iOwe && !claimed && (
                     <span className="row-actions">
                       <ConfirmButton
                         label="I've paid this"
-                        confirmLabel={`Tell ${t.toName} you paid ${formatCents(t.amountCents)}?`}
+                        confirmLabel={`Tell ${t.toName} you paid ${fmt(t.amountCents)}?`}
                         className="btn-solid-sm"
                         disabled={busy}
                         onConfirm={() => act("/payments", { direction: "sent", counterparty_id: t.toId, amount: (t.amountCents / 100).toFixed(2) })}
@@ -550,7 +555,7 @@ function BalanceHero({ meId, myNet, settlement, payments, hasExpenses, act, busy
                     <span className="row-actions">
                       <ConfirmButton
                         label="They paid me"
-                        confirmLabel={`Mark ${formatCents(t.amountCents)} from ${t.fromName} as received?`}
+                        confirmLabel={`Mark ${fmt(t.amountCents)} from ${t.fromName} as received?`}
                         className="btn-ghost-sm"
                         disabled={busy}
                         onConfirm={() => act("/payments", { direction: "received", counterparty_id: t.fromId, amount: (t.amountCents / 100).toFixed(2) })}
@@ -569,7 +574,7 @@ function BalanceHero({ meId, myNet, settlement, payments, hasExpenses, act, busy
               <li key={p.id} className="settle-row is-pending">
                 <span className="pending-text">
                   <Icon name="clock" size={16} />
-                  <span>Waiting for {p.to_name} to confirm your {formatCents(p.amount_cents)}</span>
+                  <span>Waiting for {p.to_name} to confirm your {fmt(p.amount_cents)}</span>
                 </span>
                 <button type="button" className="btn-ghost-sm" disabled={busy} onClick={() => act(`/payments/${p.id}/cancel`)}>
                   Withdraw
@@ -584,6 +589,7 @@ function BalanceHero({ meId, myNet, settlement, payments, hasExpenses, act, busy
 }
 
 function BalancesList({ balances, meId }) {
+  const { fmt } = useMoney();
   if (balances.length === 0) return null;
   return (
     <section className="side-block" aria-labelledby="balances-heading">
@@ -598,7 +604,7 @@ function BalancesList({ balances, meId }) {
             <span className={`balance-chip ${b.netCents > 0 ? "is-credit" : b.netCents < 0 ? "is-debit" : "is-square"}`}>
               <Icon name={b.netCents > 0 ? "in" : b.netCents < 0 ? "out" : "check"} size={14} />
               <span className="money">
-                {b.netCents > 0 ? `is owed ${formatCents(b.netCents)}` : b.netCents < 0 ? `owes ${formatCents(-b.netCents)}` : "square"}
+                {b.netCents > 0 ? `is owed ${fmt(b.netCents)}` : b.netCents < 0 ? `owes ${fmt(-b.netCents)}` : "square"}
               </span>
             </span>
           </li>
@@ -672,6 +678,7 @@ const STATUS_LABEL = { pending: "Waiting", confirmed: "Confirmed", declined: "De
 const STATUS_ICON = { pending: "clock", confirmed: "check", declined: "alert", voided: "ban" };
 
 function PaymentHistory({ payments, meId, act, busy }) {
+  const { fmt } = useMoney();
   if (payments.length === 0) return null;
   return (
     <details className="quiet-details">
@@ -691,7 +698,7 @@ function PaymentHistory({ payments, meId, act, busy }) {
                 <span className="muted small">{dateLabel(p.created_at)}</span>
               </span>
             </span>
-            <span className="history-amount money">{formatCents(p.amount_cents)}</span>
+            <span className="history-amount money">{fmt(p.amount_cents)}</span>
             {p.status === "confirmed" &&
               (p.from_id === meId || (p.to_id === meId && Date.now() - new Date(p.resolved_at).getTime() < UNDO_GRACE_MS)) && (
                 <ConfirmButton
@@ -732,6 +739,7 @@ function LeaveTab({ myNet, onLeave, busy }) {
 // Everything waiting on YOUR answer: charges to accept or decline, and
 // payments people say they've sent you.
 function NeedsYou({ expenses, payments, meId, act, busy }) {
+  const { fmt } = useMoney();
   const charges = [];
   for (const e of expenses) {
     if (e.voided_at || e.payer_id === meId) continue;
@@ -761,10 +769,10 @@ function NeedsYou({ expenses, payments, meId, act, busy }) {
         {charges.map(({ expense, share }) => (
           <li key={`e${expense.id}`} className="ask">
             <span className="ask-text">
-              <strong>{expense.payer_name}</strong> added <em>{expense.description}</em> ({formatCents(expense.amount_cents)})
+              <strong>{expense.payer_name}</strong> added <em>{expense.description}</em> ({fmt(expense.amount_cents)})
               — your share
             </span>
-            <span className="ask-amount money">{formatCents(share.share_cents)}</span>
+            <span className="ask-amount money">{fmt(share.share_cents)}</span>
             <span className="ask-actions">
               <button type="button" className="btn-solid-sm" disabled={busy} onClick={() => act(`/expenses/${expense.id}/accept`)}>
                 Accept
@@ -785,11 +793,11 @@ function NeedsYou({ expenses, payments, meId, act, busy }) {
             <span className="ask-text">
               <strong>{share.name}</strong> disputes their share of <em>{expense.description}</em>
             </span>
-            <span className="ask-amount money">{formatCents(share.share_cents)}</span>
+            <span className="ask-amount money">{fmt(share.share_cents)}</span>
             <span className="ask-actions">
               <ConfirmButton
                 label="Withdraw the charge"
-                confirmLabel={`Drop ${formatCents(share.share_cents)} from ${share.name}?`}
+                confirmLabel={`Drop ${fmt(share.share_cents)} from ${share.name}?`}
                 className="btn-ghost-sm"
                 disabled={busy}
                 onConfirm={() => act(`/expenses/${expense.id}/shares/${share.member_id}/withdraw`)}
@@ -802,7 +810,7 @@ function NeedsYou({ expenses, payments, meId, act, busy }) {
             <span className="ask-text">
               You disputed your share of <strong>{expense.payer_name}</strong>'s <em>{expense.description}</em>
             </span>
-            <span className="ask-amount money">{formatCents(share.share_cents)}</span>
+            <span className="ask-amount money">{fmt(share.share_cents)}</span>
             <span className="ask-actions">
               <button type="button" className="btn-ghost-sm" disabled={busy} onClick={() => act(`/expenses/${expense.id}/accept`)}>
                 Accept after all
@@ -815,7 +823,7 @@ function NeedsYou({ expenses, payments, meId, act, busy }) {
             <span className="ask-text">
               <strong>{p.from_name}</strong> says they paid you
             </span>
-            <span className="ask-amount money">{formatCents(p.amount_cents)}</span>
+            <span className="ask-amount money">{fmt(p.amount_cents)}</span>
             <span className="ask-actions">
               <button type="button" className="btn-solid-sm" disabled={busy} onClick={() => act(`/payments/${p.id}/confirm`)}>
                 Yes, I got it

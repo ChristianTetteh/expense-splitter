@@ -10,7 +10,7 @@ const { computeBalances, computeSettlement } = require("./settlement");
 // tab, serialising every write that can move money in that tab. That's what
 // makes checks like "your balance is zero, so you may leave" safe: no other
 // expense or payment can land between the check and the write.
-const MEMBERSHIP_SQL = `SELECT m.id AS member_id, g.id AS group_id, g.name, g.owner_id, g.invite_token, g.created_at
+const MEMBERSHIP_SQL = `SELECT m.id AS member_id, g.id AS group_id, g.name, g.currency, g.owner_id, g.invite_token, g.created_at
   FROM members m JOIN groups g ON g.id = m.group_id
   WHERE m.group_id = $1 AND m.user_id = $2 AND m.left_at IS NULL`;
 
@@ -152,6 +152,7 @@ async function loadGroupState(db, membership, userId) {
     group: {
       id: groupId,
       name: membership.name,
+      currency: membership.currency,
       created_at: membership.created_at,
       is_owner: isOwner,
       // The invite token is only ever shown to the owner.

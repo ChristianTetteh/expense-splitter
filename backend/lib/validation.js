@@ -112,10 +112,16 @@ function validateLogin(body = {}) {
   return { email, password };
 }
 
+const CURRENCIES = ["GHS", "USD"];
+const DEFAULT_CURRENCY = "GHS";
+
 function validateGroupName(body = {}) {
   const name = cleanText(body.name);
   if (name.length < 2 || name.length > 80) return { error: "Give the tab a name between 2 and 80 characters." };
-  return { name };
+  // Omitted = the default (Ghana cedis); anything else must be a supported code.
+  const currency = body.currency === undefined ? DEFAULT_CURRENCY : body.currency;
+  if (!CURRENCIES.includes(currency)) return { error: "Pick Ghana cedis (GHS) or US dollars (USD) as the tab's currency." };
+  return { name, currency };
 }
 
 // `activeMemberIds` is the Set of member ids currently in the tab. The payer
@@ -129,7 +135,7 @@ function validateExpenseInput(body = {}, activeMemberIds) {
 
   const amountCents = parseAmount(body.amount);
   if (amountCents === null) {
-    return { error: "Enter a valid amount between $0.01 and $1,000,000, with at most 2 decimal places." };
+    return { error: "Enter a valid amount between 0.01 and 1,000,000, with at most 2 decimal places." };
   }
 
   const raw = body.participant_ids;
@@ -147,7 +153,7 @@ function validateExpenseInput(body = {}, activeMemberIds) {
   }
 
   if (amountCents < ids.size) {
-    return { error: `${ids.size} people can't split less than ${ids.size} cents — everyone's share must be at least $0.01.` };
+    return { error: `${ids.size} people can't split less than ${(ids.size / 100).toFixed(2)} — everyone's share must be at least 0.01.` };
   }
 
   return { description, amountCents, participantIds: [...ids].sort((a, b) => a - b) };
@@ -166,13 +172,15 @@ function validatePaymentInput(body = {}, myMemberId, activeMemberIds) {
 
   const amountCents = parseAmount(body.amount);
   if (amountCents === null) {
-    return { error: "Enter a valid amount between $0.01 and $1,000,000, with at most 2 decimal places." };
+    return { error: "Enter a valid amount between 0.01 and 1,000,000, with at most 2 decimal places." };
   }
   return { direction, counterpartyId, amountCents };
 }
 
 module.exports = {
   MAX_GROUP_MEMBERS,
+  CURRENCIES,
+  DEFAULT_CURRENCY,
   MAX_GROUPS_PER_USER,
   MAX_PENDING_REQUESTS_PER_GROUP,
   MAX_PENDING_PAYMENTS_PER_MEMBER,

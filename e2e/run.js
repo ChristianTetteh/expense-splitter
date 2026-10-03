@@ -98,7 +98,7 @@ async function signup(page, name) {
   await ama.getByRole("button", { name: "Let in" }).click();
   await ama.getByText("Kwesi", { exact: true }).first().waitFor();
 
-  // Ama adds a $30 dinner split with both.
+  // Ama adds a GH₵30 dinner split with both.
   await ama.getByRole("button", { name: "+ Add something you paid for" }).click();
   await ama.getByLabel("What was it for").fill("Dinner");
   await ama.getByLabel("Amount you paid").fill("30");
@@ -110,19 +110,19 @@ async function signup(page, name) {
   await kwesi.goto(tabUrl);
   await kwesi.getByText("Needs your OK").waitFor();
   await kwesi.getByRole("button", { name: "Accept" }).click();
-  await kwesi.getByText("You owe $15.00").waitFor();
+  await kwesi.getByText("You owe GH₵15.00").waitFor();
   await ama.reload();
-  await ama.getByText("You're owed $15.00").waitFor();
+  await ama.getByText("You're owed GH₵15.00").waitFor();
   check("after accepting, the debt counts on both sides", true);
 
-  // Kwesi tries the fake-expense trick: a $15 "expense" charged only to Ama.
+  // Kwesi tries the fake-expense trick: a GH₵15 "expense" charged only to Ama.
   await kwesi.getByRole("button", { name: "+ Add something you paid for" }).click();
   await kwesi.getByLabel("What was it for").fill("Totally real");
   await kwesi.getByLabel("Amount you paid").fill("15");
   await kwesi.getByRole("checkbox", { name: "You" }).uncheck();
   await kwesi.getByRole("button", { name: "Add to the tab" }).click();
   await kwesi.getByText(/Ama: hasn't accepted yet/).waitFor();
-  check("fake expense doesn't touch his debt", await kwesi.getByText("You owe $15.00").isVisible());
+  check("fake expense doesn't touch his debt", await kwesi.getByText("You owe GH₵15.00").isVisible());
   await ama.reload();
   await ama.getByText("Needs your OK").waitFor();
   await ama.getByRole("button", { name: "Decline" }).click();
@@ -130,7 +130,7 @@ async function signup(page, name) {
   await ama.getByText("You: disputes this").waitFor();
   await kwesi.reload();
   await kwesi.getByText("Ama: disputes this").waitFor();
-  check("creditor's decline is visible to him and the debt stands", await kwesi.getByText("You owe $15.00").isVisible());
+  check("creditor's decline is visible to him and the debt stands", await kwesi.getByText("You owe GH₵15.00").isVisible());
   const dinnerRow = kwesi.getByRole("listitem").filter({ hasText: "Dinner" }).filter({ hasText: "Ama paid" });
   const voidButtons = await dinnerRow.getByRole("button", { name: "void" }).count();
   check("debtor gets no 'void' button on someone else's expense", voidButtons === 0);
@@ -140,7 +140,7 @@ async function signup(page, name) {
   await kwesi.getByRole("button", { name: "I've paid this" }).click();
   await kwesi.getByRole("button", { name: "Yes" }).click();
   await kwesi.getByText(/Waiting for Ama to confirm/).waitFor();
-  check("debtor's claim is pending and he still owes", await kwesi.getByText("You owe $15.00").isVisible());
+  check("debtor's claim is pending and he still owes", await kwesi.getByText("You owe GH₵15.00").isVisible());
 
   await ama.reload();
   await ama.getByText(/says they paid you/).waitFor();
@@ -174,6 +174,21 @@ async function signup(page, name) {
   check("after leaving, the tab is gone for him", true);
 
   await ama.screenshot({ path: __dirname + "/ama-tab.png", fullPage: true });
+
+  // Currency: the tab above is in cedis by default; a second tab can be made in dollars.
+  await ama.goto(`${BASE}/`);
+  await ama.getByLabel("Tab name").fill("US trip");
+  await ama.getByRole("radio", { name: /US dollars/ }).check();
+  await ama.getByRole("button", { name: "Start the tab" }).click();
+  await ama.waitForURL(/\/tabs\//);
+  await ama.getByRole("button", { name: "+ Add something you paid for" }).click();
+  await ama.getByLabel("What was it for").fill("Tickets");
+  await ama.getByLabel("Amount you paid").fill("40");
+  await ama.getByRole("button", { name: "Add to the tab" }).click();
+  await ama.getByText("$40.00").first().waitFor();
+  check("a tab made in dollars shows $ amounts, not cedis", (await ama.getByText("GH₵").count()) === 0);
+  await ama.goto(`${BASE}/`);
+  await ama.getByText("Kumasi weekend").waitFor();
   // ── Password reset ────────────────────────────────────────────────────
   // Mail never leaves the machine: the backend is started with MAIL_OUTBOX_FILE,
   // which makes it append each message to a file instead of sending it.

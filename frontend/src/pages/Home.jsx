@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import api, { errorMessage, post } from "../api";
-import { formatCents } from "../utils/money";
+import { CURRENCIES, DEFAULT_CURRENCY, formatCents } from "../utils/money";
 import { Icon, TallyMark } from "../components/Icons.jsx";
 
-function standing(netCents) {
-  if (netCents > 0) return { text: `You're owed ${formatCents(netCents)}`, cls: "is-credit", icon: "in" };
-  if (netCents < 0) return { text: `You owe ${formatCents(-netCents)}`, cls: "is-debit", icon: "out" };
+function standing(netCents, currency) {
+  if (netCents > 0) return { text: `You're owed ${formatCents(netCents, { currency })}`, cls: "is-credit", icon: "in" };
+  if (netCents < 0) return { text: `You owe ${formatCents(-netCents, { currency })}`, cls: "is-debit", icon: "out" };
   return { text: "You're square", cls: "is-square", icon: "check" };
 }
 
@@ -15,6 +15,7 @@ export default function Home() {
   const [groups, setGroups] = useState(null);
   const [loadError, setLoadError] = useState("");
   const [name, setName] = useState("");
+  const [currency, setCurrency] = useState(DEFAULT_CURRENCY);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -30,7 +31,7 @@ export default function Home() {
     setError("");
     setBusy(true);
     try {
-      const res = await post("/groups", { name });
+      const res = await post("/groups", { name, currency });
       navigate(`/tabs/${res.data.group.id}`);
     } catch (err) {
       setError(errorMessage(err));
@@ -64,7 +65,7 @@ export default function Home() {
         ) : (
           <ul className="tab-list">
             {(groups || []).map((g) => {
-              const s = standing(g.net_cents);
+              const s = standing(g.net_cents, g.currency);
               return (
                 <li key={g.id}>
                   <Link to={`/tabs/${g.id}`} className={`tab-card ${s.cls}`}>
@@ -100,6 +101,18 @@ export default function Home() {
             <span>Tab name</span>
             <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Weekend in Kumasi" maxLength={80} required />
           </label>
+          <fieldset className="pad-field plain-fieldset">
+            <legend>Currency</legend>
+            <div className="seg" role="radiogroup" aria-label="Currency">
+              {Object.values(CURRENCIES).map((c) => (
+                <label key={c.code} className={`seg-opt${currency === c.code ? " is-on" : ""}`}>
+                  <input type="radio" name="currency" value={c.code} checked={currency === c.code} onChange={() => setCurrency(c.code)} />
+                  <span>{c.name} <span className="seg-sym">({c.symbol})</span></span>
+                </label>
+              ))}
+            </div>
+            <p className="muted small">Everyone on the tab uses it. It can't be changed once the tab is made.</p>
+          </fieldset>
           {error && <p className="form-error" role="alert">{error}</p>}
           <button className="btn-primary" type="submit" disabled={busy}>
             {busy ? "Starting…" : "Start the tab"}
