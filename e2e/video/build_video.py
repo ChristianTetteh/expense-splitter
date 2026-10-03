@@ -7,7 +7,7 @@ line leads from the feature to a card explaining it; then the demo resumes.
 
 Usage: python3 build_video.py <config.json>
 config: {"rec": dir, "out": file.mp4, "title", "tagline", "subtitle",
-         "built_with", "points", "url"}
+         "built_with", "points", "url", optional "accent": [r, g, b]}
 """
 import json
 import os
@@ -46,7 +46,7 @@ def rounded_mask(size, r):
     return m
 
 
-def callout_image(shot_path, box, title, body, out_path):
+def callout_image(shot_path, box, title, body, out_path, accent=ACCENT):
     shot = Image.open(shot_path).convert("RGB")
     x, y, w, h = box
     pad = 12
@@ -93,9 +93,9 @@ def callout_image(shot_path, box, title, body, out_path):
     shadow = shadow.filter(ImageFilter.GaussianBlur(12))
     bg.paste(shadow, (int(kx) - 20, int(ky) - 20), shadow)
     d.rounded_rectangle([kx, ky, kx + card_w, ky + card_h], 22, fill=(255, 255, 255))
-    d.rectangle([kx, ky + 26, kx + 6, ky + 26 + 34], fill=ACCENT)
+    d.rectangle([kx, ky + 26, kx + 6, ky + 26 + 34], fill=accent)
     ty = ky + pad_c - 4
-    eyebrow_f.draw(d, (kx + pad_c, ty), "HOW IT WORKS", ACCENT)
+    eyebrow_f.draw(d, (kx + pad_c, ty), "HOW IT WORKS", accent)
     ty += 34
     for line in t_lines:
         title_f.draw(d, (kx + pad_c, ty), line, INK)
@@ -186,7 +186,7 @@ def main(cfg_path):
             words = len((z["title"] + " " + z["body"]).split())
             hold = min(7.0, max(3.4, words / 3.5 + 0.8))
             callout = os.path.join(work, f"callout{i}.png")
-            callout_image(z["shot"], z["box"], z["title"], z["body"], callout)
+            callout_image(z["shot"], z["box"], z["title"], z["body"], callout, tuple(cfg.get("accent", ACCENT)))
             fz = os.path.join(work, f"freeze{i}.mp4")
             a1, b_len, a2 = 0.25 + FADE_IN, hold + FADE_IN + FADE_OUT, 0.6
             off2 = 0.25 + FADE_IN + hold
