@@ -94,3 +94,7 @@ These are deliberate and also listed in the README.
 - No email verification at signup. Password reset works only when the mail provider (`BREVO_API_KEY`, `MAIL_FROM`) is configured; without it no email is sent.
 - Anyone who knows an address can use up its 3 reset emails an hour. This delays that person's reset email; it reveals nothing and changes nothing.
 - Checks that run only on the live site are limited to headers, direct-access refusal, status codes and CSP. The full two-user money flow was tested locally, not on the live site.
+
+## Demo video
+
+`e2e/record-demo.js` drives the same flow as a scripted demo (Ama on camera, Kwesi off-camera) against the local stack, capturing sharp frames with the Chrome DevTools screencast and logging captions and "freeze" moments. `e2e/video/build_video.py <config.json>` turns that into the finished 1080p video: captions in a bar under the app, freeze-frame callouts that blur everything but the feature being explained, title and end cards, and a quiet generated music bed (`e2e/video/music.py`). Needs ffmpeg, Python 3 with Pillow, NumPy, SciPy and fontTools.
