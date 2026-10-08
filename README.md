@@ -1,4 +1,5 @@
 # Tally — split a shared tab, settle up fast.
+**Built by Christian Tetteh a full stack developer intern at Career Ghana**
 
 A full-stack expense splitter built for the "Expense Splitter Web App" intern task:
 **React + Node/Express + PostgreSQL**, deployed and tested. Each tab is private to the people in
